@@ -103,7 +103,7 @@ int tap_set_machine(struct tap_t *tap, u_int8_t machine, u_int8_t videotype){
   return TAP_OK;
 }
   
-int tap_get_pulse(struct tap_t *tap, struct tap_pulse *pulse){
+u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
   unsigned long found_pulse;
 
   while(tap->buffer<tap->bufend){
@@ -134,17 +134,17 @@ int tap_get_pulse(struct tap_t *tap, struct tap_pulse *pulse){
 	    tap->max_val = tap->prev_val;
 	    found_pulse = (float)(tap->input_pos - tap->max)*tap_clocks[tap->machine][tap->videotype]/(float)tap->freq;
 	    tap->max = tap->input_pos;
-	    found_pulse = (found_pulse<1<<24 ? found_pulse  :1<<24-1);
-	    pulse->version_1[0]=0;
+	    return (found_pulse < 1<<24 ? found_pulse :1<<24-1);
+/*	    pulse->version_1[0]=0;
 	    pulse->version_1[1]= found_pulse     &0xff;
 	    pulse->version_1[2]=(found_pulse>> 8)&0xff;
 	    pulse->version_1[3]=(found_pulse>>16)&0xff;
 	    pulse->version_0=(found_pulse<256*8 ? found_pulse/8:0);
-	    return TAP_OK;
+	    return TAP_OK;*/
 	  }
     }
   }
-  return TAP_END_BUFFER;
+  return 1<<24;
 }
 
 int tap_get_pos(struct tap_t *tap){
@@ -160,28 +160,35 @@ void tap_set_pulse(struct tap_t *tap, u_int32_t pulse){
     tap->val = -tap->val;
   tap->this_pulse_len=
     tap->to_be_consumed=
-    pulse*(float)tap->freq/(float)tap_clocks[tap->machine][tap->videotype]/2.0;
+    pulse*(float)tap->freq/(float)tap_clocks[tap->machine][tap->videotype];
+}
+
+static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
+	if (to_be_consumed > this_pulse_len/2)
+		return volume;
+	return -volume;
 }
 
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
-	int samples_now, samples_done = 0, i;
+	int /*samples_now, i,*/ samples_done = 0;
 
-	while(buflen){
+	/*while(buflen){
 		samples_now=MIN(buflen, tap->to_be_consumed);
-		for(i=0; i < samples_now; i++)
-			*buffer++ = (tap->inverted ? -tap->val : tap->val);
-		samples_done += samples_now;
-		tap->to_be_consumed -= samples_now;
-		buflen -= samples_now;
-		if (tap->to_be_consumed == 0){
-			if (tap->val > 0){
-				tap->val = -tap->val;
-				tap->to_be_consumed = tap->this_pulse_len;
-			}
-			else
-				break;
-		}
+		for(i=0; i < samples_now; i++)*/
+	while(buflen > 0 && tap->to_be_consumed > 0){
+		*buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
+		samples_done += 1;
+		tap->to_be_consumed -= 1;
+		buflen -= 1;
 	}
+/*	if (tap->to_be_consumed == 0){
+		if (tap->val > 0){
+			tap->val = -tap->val;
+			tap->to_be_consumed = tap->this_pulse_len;
+		}
+		else
+			break;
+	}*/
 
 	return samples_done;
 }

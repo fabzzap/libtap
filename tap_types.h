@@ -34,10 +34,10 @@
 #define TAP_VIDEOTYPE_NTSC 1
 #define TAP_VIDEOTYPE_MAX  1
 
-struct tap_pulse{
+/*struct tap_pulse{
   unsigned char version_0;
   unsigned char version_1[4];
-};
+};*/
 
 /* These typedef's are taken from Cygwin's headers, therefore they should be right */
 #if (defined WIN32 && !defined __CYGWIN__)
