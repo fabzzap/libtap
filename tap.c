@@ -109,7 +109,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
   while(tap->buffer<tap->bufend){
     tap->prev_val = tap->val;
     tap->val = *tap->buffer++;
-    if (tap->inverted) tap->val=-tap->val;
+    if (tap->inverted) tap->val=~tap->val;
     tap->input_pos++;
 
     tap->prev_increasing = tap->increasing;
