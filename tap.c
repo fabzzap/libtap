@@ -1,9 +1,9 @@
 /* TAP shared library: a library for converting audio data (as a stream of
  * PCM signed 32-bit samples, mono) to raw TAP data and back
- * 
+ *
  * TAP specification was written by Per Håkan Sundell and is available at
  * http://www.computerbrains.com/tapformat.html
- * 
+ *
  * The algorithm for TAP encoding was originally written by Janne Veli
  * Kujala, based on the one written by Andreas Matthies for Tape64.
  * Some modifications and adaptation to library format by Fabrizio Gennari
@@ -102,7 +102,7 @@ int tap_set_machine(struct tap_t *tap, u_int8_t machine, u_int8_t videotype){
   tap->videotype=videotype;
   return TAP_OK;
 }
-  
+
 u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
   unsigned long found_pulse;
 
@@ -148,7 +148,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
 }
 
 int tap_get_pos(struct tap_t *tap){
-  return tap->input_pos - 1;
+  return tap->input_pos - 2;
 }
 
 int32_t tap_get_max(struct tap_t *tap){
