@@ -1,0 +1,17 @@
+LIBRARY      TAP.DLL
+
+EXPORTS
+    ; Explicit exports can go here
+	tap_fromaudio_init           
+	tap_toaudio_init             
+	tap_set_buffer               
+	tap_set_machine              
+	tap_get_pulse                
+	tap_get_pos                  
+	tap_get_max
+	tap_set_pulse                
+	tap_get_buffer               
+	tap_exit                     
+
+   ;123456789012345678901234567890123456
+   ;000000000111111111122222222223333333
