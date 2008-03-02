@@ -27,6 +27,8 @@
 
 #define MIN(a,b) ( (a) < (b) ? (a) : (b) )
 
+#define OVERFLOW_VALUE (TAP_NO_MORE_SAMPLES - 1)
+
 struct tap_t{
   u_int32_t increasing;
   u_int32_t prev_increasing;
@@ -35,10 +37,14 @@ struct tap_t{
   u_int32_t min_duration;
   u_int32_t min_height;
   int32_t *buffer, *bufstart, *bufend, val, prev_val, max_val, min_val;
-  u_int32_t max, min;
+  u_int32_t max, min, temp_max;
+  u_int32_t stored_overflows, overflows_to_flush;
   int inverted;
   u_int8_t machine, videotype;
   u_int32_t to_be_consumed, this_pulse_len;
+  float factor;
+  u_int32_t overflow_samples;
+  u_int8_t flushing;
 };
 
 const float tap_clocks[][2]={
@@ -47,13 +53,25 @@ const float tap_clocks[][2]={
   {886724,894886}  /* C16 */
 };
 
+static void set_factor(struct tap_t *tap){
+  tap->factor = tap_clocks[tap->machine][tap->videotype]/(float)tap->freq;
+  tap->overflow_samples = OVERFLOW_VALUE/tap->factor - 10;
+    
+  /*overcome imprecision of float arithmetics*/
+  do
+  {
+    tap->overflow_samples++;
+  }while (tap->overflow_samples*tap->factor <= OVERFLOW_VALUE);
+  tap->overflow_samples--;
+}
+
 struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int32_t min_height, int inverted){
   struct tap_t *tap;
 
   if (infreq==0) return NULL;
   tap=malloc(sizeof(struct tap_t));
   if (tap==NULL) return NULL;
-  tap->prev_increasing=0;
+  tap->increasing=0;
   tap->input_pos=0;
   tap->freq=infreq;
   tap->min_duration=min_duration;
@@ -65,11 +83,16 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->val=0;
   tap->max=0;
   tap->min=0;
+  tap->temp_max=0;
+  tap->stored_overflows=0;
+  tap->overflows_to_flush=0;
   tap->max_val=2147483647;
   tap->min_val=-2147483647;
   tap->inverted=inverted;
   tap->machine=TAP_MACHINE_C64;
   tap->videotype=TAP_VIDEOTYPE_PAL;
+  set_factor(tap);
+  tap->flushing=0;
   return tap;
 }
 
@@ -87,6 +110,7 @@ struct tap_t *tap_toaudio_init(u_int32_t outfreq, int32_t volume, int inverted){
   tap->inverted=inverted;
   tap->machine=TAP_MACHINE_C64;
   tap->videotype=TAP_VIDEOTYPE_PAL;
+  set_factor(tap);
   return tap;
 }
 
@@ -100,12 +124,31 @@ int tap_set_machine(struct tap_t *tap, u_int8_t machine, u_int8_t videotype){
     return TAP_INVALID;
   tap->machine=machine;
   tap->videotype=videotype;
+  set_factor(tap);
   return TAP_OK;
 }
 
 u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
   unsigned long found_pulse;
 
+  if (tap->flushing && tap->max < tap->temp_max){
+    found_pulse = (tap->temp_max - tap->max)*tap->factor;
+    tap->max = tap->temp_max;
+    tap->overflows_to_flush = (tap->input_pos - tap->max) / tap->overflow_samples;
+    return (found_pulse % OVERFLOW_VALUE);
+  }
+  
+  if (tap->overflows_to_flush != 0){
+    tap->overflows_to_flush--;
+    return OVERFLOW_VALUE;
+  }
+
+  if (tap->flushing && tap->max < tap->input_pos){
+    found_pulse = (tap->input_pos - tap->max)*tap->factor;
+    tap->max = tap->input_pos;
+    return (found_pulse % OVERFLOW_VALUE);
+  }
+  
   while(tap->buffer<tap->bufend){
     tap->prev_val = tap->val;
     tap->val = *tap->buffer++;
@@ -117,42 +160,53 @@ u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
     else tap->increasing = (tap->val > tap->prev_val);
 
     if (tap->increasing != tap->prev_increasing) /* A min or max has been reached. Is it a true one? */
-      {
-	  if (tap->increasing
-	      && tap->max >= tap->min
-	      && tap->input_pos - tap->max > tap->min_duration
-	      && tap->max_val > tap->prev_val
-	      && (u_int32_t)(tap->max_val-tap->prev_val) > tap->min_height){ /* A minimum */
-	    tap->min = tap->input_pos;
-	    tap->min_val = tap->prev_val;
-	  }
-	  else if (!tap->increasing
-		   && tap->min >= tap->max
-		   && tap->input_pos - tap->min > tap->min_duration
-		   && tap->prev_val > tap->min_val
-		   && (u_int32_t)(tap->prev_val-tap->min_val) > tap->min_height){ /* A maximum */
-	    tap->max_val = tap->prev_val;
-	    found_pulse = (float)(tap->input_pos - tap->max)*tap_clocks[tap->machine][tap->videotype]/(float)tap->freq;
-	    tap->max = tap->input_pos;
-	    return (found_pulse < 1<<24 ? found_pulse :1<<24-1);
-/*	    pulse->version_1[0]=0;
-	    pulse->version_1[1]= found_pulse     &0xff;
-	    pulse->version_1[2]=(found_pulse>> 8)&0xff;
-	    pulse->version_1[3]=(found_pulse>>16)&0xff;
-	    pulse->version_0=(found_pulse<256*8 ? found_pulse/8:0);
-	    return TAP_OK;*/
-	  }
+    {
+      if (tap->increasing
+          && tap->input_pos - tap->temp_max > tap->min_duration
+          && tap->max_val > tap->prev_val
+          && (u_int32_t)(tap->max_val-tap->prev_val) > tap->min_height){ /* A minimum */
+        tap->min = tap->input_pos;
+        tap->min_val = tap->prev_val;
+        if (tap->max < tap->temp_max){
+          found_pulse = (tap->temp_max - tap->max)*tap->factor;
+          tap->max = tap->temp_max;
+          tap->stored_overflows = (tap->input_pos - tap->max) / tap->overflow_samples;
+          return (found_pulse % OVERFLOW_VALUE);
+        }
+      }
+      else if (!tap->increasing
+           && tap->input_pos - tap->min > tap->min_duration
+           && tap->prev_val > tap->min_val
+           && (u_int32_t)(tap->prev_val-tap->min_val) > tap->min_height){ /* A maximum */
+        tap->temp_max = tap->input_pos;
+        tap->max_val = tap->prev_val;
+        tap->overflows_to_flush = tap->stored_overflows;
+        tap->stored_overflows=0;
+      }
+    }
+    if ( ((tap->input_pos - tap->max) % tap->overflow_samples) == 0 ){
+      tap->stored_overflows++;
     }
   }
-  return 1<<24;
+  return TAP_NO_MORE_SAMPLES;
 }
 
 int tap_get_pos(struct tap_t *tap){
   return tap->input_pos - 2;
 }
+    
+void tap_flush(struct tap_t *tap){
+  tap->flushing = 1;
+  tap->overflows_to_flush = tap->stored_overflows;
+  tap->stored_overflows=0;
+}
+
+u_int8_t tap_is_flushing(struct tap_t *tap){
+  return tap->flushing;
+}
 
 int32_t tap_get_max(struct tap_t *tap){
-	return tap->max_val;
+  return tap->max_val;
 }
 
 void tap_set_pulse(struct tap_t *tap, u_int32_t pulse){
@@ -164,35 +218,24 @@ void tap_set_pulse(struct tap_t *tap, u_int32_t pulse){
 }
 
 static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
-	if (to_be_consumed > this_pulse_len/2)
-		return volume;
-	return -volume;
+    if (to_be_consumed > this_pulse_len/2)
+        return volume;
+    return -volume;
 }
 
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
-	int /*samples_now, i,*/ samples_done = 0;
+    int samples_done = 0;
 
-	/*while(buflen){
-		samples_now=MIN(buflen, tap->to_be_consumed);
-		for(i=0; i < samples_now; i++)*/
-	while(buflen > 0 && tap->to_be_consumed > 0){
-		*buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
-		samples_done += 1;
-		tap->to_be_consumed -= 1;
-		buflen -= 1;
-	}
-/*	if (tap->to_be_consumed == 0){
-		if (tap->val > 0){
-			tap->val = -tap->val;
-			tap->to_be_consumed = tap->this_pulse_len;
-		}
-		else
-			break;
-	}*/
+    while(buflen > 0 && tap->to_be_consumed > 0){
+        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
+        samples_done += 1;
+        tap->to_be_consumed -= 1;
+        buflen -= 1;
+    }
 
-	return samples_done;
+    return samples_done;
 }
 
 void tap_exit(struct tap_t *tap){
-	free(tap);
+    free(tap);
 }
