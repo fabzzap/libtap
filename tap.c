@@ -192,7 +192,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
 }
 
 int tap_get_pos(struct tap_t *tap){
-  return tap->input_pos - 2;
+  return tap->max - 2;
 }
     
 void tap_flush(struct tap_t *tap){
