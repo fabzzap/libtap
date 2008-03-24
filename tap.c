@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <malloc.h>
 #include <sys/types.h>
+#include <math.h>
 #include "tap.h"
 
 #define MIN(a,b) ( (a) < (b) ? (a) : (b) )
@@ -214,7 +215,7 @@ void tap_set_pulse(struct tap_t *tap, u_int32_t pulse){
     tap->val = -tap->val;
   tap->this_pulse_len=
     tap->to_be_consumed=
-    pulse*(float)tap->freq/(float)tap_clocks[tap->machine][tap->videotype];
+    (pulse/(float)tap->factor)+1;
 }
 
 static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
@@ -223,11 +224,15 @@ static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_
     return -volume;
 }
 
+static int32_t tap_get_sine_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
+    return volume*sin(to_be_consumed*2*M_PI/this_pulse_len);
+}
+
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
     int samples_done = 0;
 
     while(buflen > 0 && tap->to_be_consumed > 0){
-        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
+        *buffer++ = tap_get_sine_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
         samples_done += 1;
         tap->to_be_consumed -= 1;
         buflen -= 1;
