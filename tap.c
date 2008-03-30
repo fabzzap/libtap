@@ -30,6 +30,13 @@
 
 #define OVERFLOW_VALUE (TAP_NO_MORE_SAMPLES - 1)
 
+enum trigger_state
+{
+    WAITING_FOR_RISING_EDGE,
+    WAITING_FOR_FALLING_EDGE,
+    TRIGGERED
+};
+
 struct tap_t{
   u_int32_t increasing;
   u_int32_t prev_increasing;
@@ -37,15 +44,15 @@ struct tap_t{
   u_int32_t freq;
   u_int32_t min_duration;
   u_int32_t min_height;
-  int32_t *buffer, *bufstart, *bufend, val, prev_val, max_val, min_val;
-  u_int32_t max, min, temp_max;
-  u_int32_t stored_overflows, overflows_to_flush;
+  int32_t *buffer, *bufstart, *bufend, val, prev_val, max_val, min_val, trigger_val;
+  u_int32_t max, min, prev_trigger;
   int inverted;
   u_int8_t machine, videotype;
   u_int32_t to_be_consumed, this_pulse_len;
   float factor;
   u_int32_t overflow_samples;
   u_int8_t flushing;
+  enum trigger_state triggered;
 };
 
 const float tap_clocks[][2]={
@@ -80,13 +87,12 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->buffer=NULL;
   tap->bufstart=NULL;
   tap->bufend=NULL;
-  tap->prev_val=0;
   tap->val=0;
   tap->max=0;
   tap->min=0;
-  tap->temp_max=0;
-  tap->stored_overflows=0;
-  tap->overflows_to_flush=0;
+  tap->trigger_val=0;
+  tap->triggered=TRIGGERED;
+  tap->prev_trigger=0;
   tap->max_val=2147483647;
   tap->min_val=-2147483647;
   tap->inverted=inverted;
@@ -129,31 +135,16 @@ int tap_set_machine(struct tap_t *tap, u_int8_t machine, u_int8_t videotype){
   return TAP_OK;
 }
 
-u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
-  unsigned long found_pulse;
-
-  if (tap->flushing && tap->max < tap->temp_max){
-    found_pulse = (tap->temp_max - tap->max)*tap->factor;
-    tap->max = tap->temp_max;
-    tap->overflows_to_flush = (tap->input_pos - tap->max) / tap->overflow_samples;
-    return (found_pulse % OVERFLOW_VALUE);
-  }
-  
-  if (tap->overflows_to_flush != 0){
-    tap->overflows_to_flush--;
-    return OVERFLOW_VALUE;
-  }
-
-  if (tap->flushing && tap->max < tap->input_pos){
-    found_pulse = (tap->input_pos - tap->max)*tap->factor;
-    tap->max = tap->input_pos;
-    return (found_pulse % OVERFLOW_VALUE);
-  }
-  
+u_int32_t tap_get_pulse(struct tap_t *tap){
   while(tap->buffer<tap->bufend){
+    enum{
+      NOTHING_HAPPENED,
+      RISING_EDGE_HAPPENED,
+      FALLING_EDGE_HAPPENED
+    } event = NOTHING_HAPPENED;
+    
     tap->prev_val = tap->val;
     tap->val = *tap->buffer++;
-    if (tap->inverted) tap->val=~tap->val;
     tap->input_pos++;
 
     tap->prev_increasing = tap->increasing;
@@ -163,43 +154,60 @@ u_int32_t tap_get_pulse(struct tap_t *tap/*, struct tap_pulse *pulse*/){
     if (tap->increasing != tap->prev_increasing) /* A min or max has been reached. Is it a true one? */
     {
       if (tap->increasing
-          && tap->input_pos - tap->temp_max > tap->min_duration
+          && (tap->triggered==TRIGGERED || tap->input_pos - tap->max > tap->min_duration)
           && tap->max_val > tap->prev_val
           && (u_int32_t)(tap->max_val-tap->prev_val) > tap->min_height){ /* A minimum */
         tap->min = tap->input_pos;
         tap->min_val = tap->prev_val;
-        if (tap->max < tap->temp_max){
-          found_pulse = (tap->temp_max - tap->max)*tap->factor;
-          tap->max = tap->temp_max;
-          tap->stored_overflows = (tap->input_pos - tap->max) / tap->overflow_samples;
-          return (found_pulse % OVERFLOW_VALUE);
-        }
+        if (tap->triggered==WAITING_FOR_FALLING_EDGE)
+          event=FALLING_EDGE_HAPPENED;
+        tap->triggered=WAITING_FOR_RISING_EDGE;
+        tap->trigger_val = tap->min_val/2 + tap->max_val/2;
       }
       else if (!tap->increasing
-           && tap->input_pos - tap->min > tap->min_duration
+           && (tap->triggered==TRIGGERED || tap->input_pos - tap->min > tap->min_duration)
            && tap->prev_val > tap->min_val
            && (u_int32_t)(tap->prev_val-tap->min_val) > tap->min_height){ /* A maximum */
-        tap->temp_max = tap->input_pos;
+        tap->max = tap->input_pos;
         tap->max_val = tap->prev_val;
-        tap->overflows_to_flush = tap->stored_overflows;
-        tap->stored_overflows=0;
+        if (tap->triggered==WAITING_FOR_RISING_EDGE)
+          event=RISING_EDGE_HAPPENED;
+        tap->triggered=WAITING_FOR_FALLING_EDGE;
+        tap->trigger_val = tap->min_val/2 + tap->max_val/2;
       }
     }
-    if ( ((tap->input_pos - tap->max) % tap->overflow_samples) == 0 ){
-      tap->stored_overflows++;
+
+    if (tap->triggered == WAITING_FOR_RISING_EDGE && tap->val > tap->trigger_val){
+      tap->triggered=TRIGGERED;
+      event = RISING_EDGE_HAPPENED;
+    }
+    if (tap->triggered == WAITING_FOR_FALLING_EDGE && tap->val < tap->trigger_val){
+      tap->triggered=TRIGGERED;
+      event = FALLING_EDGE_HAPPENED;
+    }
+    
+    if ( ( tap->inverted && event == FALLING_EDGE_HAPPENED)
+      || (!tap->inverted && event ==  RISING_EDGE_HAPPENED)
+       )
+    {
+      u_int32_t found_pulse = ( (tap->input_pos - tap->prev_trigger)*tap->factor);
+      tap->prev_trigger = tap->input_pos;
+      return found_pulse % OVERFLOW_VALUE;
+    }
+    if ( ((tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == 0)
+    {      
+      return OVERFLOW_VALUE;
     }
   }
   return TAP_NO_MORE_SAMPLES;
 }
 
 int tap_get_pos(struct tap_t *tap){
-  return tap->max - 2;
+  return tap->input_pos - 2;
 }
     
 void tap_flush(struct tap_t *tap){
   tap->flushing = 1;
-  tap->overflows_to_flush = tap->stored_overflows;
-  tap->stored_overflows=0;
 }
 
 u_int8_t tap_is_flushing(struct tap_t *tap){
@@ -232,7 +240,7 @@ u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen
     int samples_done = 0;
 
     while(buflen > 0 && tap->to_be_consumed > 0){
-        *buffer++ = tap_get_sine_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
+        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
         samples_done += 1;
         tap->to_be_consumed -= 1;
         buflen -= 1;
