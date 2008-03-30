@@ -33,8 +33,9 @@
 enum trigger_state
 {
     WAITING_FOR_RISING_EDGE,
+    RISING_EDGE_HAPPENED,
     WAITING_FOR_FALLING_EDGE,
-    TRIGGERED
+    FALLING_EDGE_HAPPENED
 };
 
 struct tap_t{
@@ -91,7 +92,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->max=0;
   tap->min=0;
   tap->trigger_val=0;
-  tap->triggered=TRIGGERED;
+  tap->triggered=RISING_EDGE_HAPPENED;
   tap->prev_trigger=0;
   tap->max_val=2147483647;
   tap->min_val=-2147483647;
@@ -138,10 +139,10 @@ int tap_set_machine(struct tap_t *tap, u_int8_t machine, u_int8_t videotype){
 u_int32_t tap_get_pulse(struct tap_t *tap){
   while(tap->buffer<tap->bufend){
     enum{
-      NOTHING_HAPPENED,
-      RISING_EDGE_HAPPENED,
-      FALLING_EDGE_HAPPENED
-    } event = NOTHING_HAPPENED;
+      NOTHING_HAPPENED_NOW,
+      RISING_EDGE_HAPPENED_NOW,
+      FALLING_EDGE_HAPPENED_NOW
+    } event = NOTHING_HAPPENED_NOW;
     
     tap->prev_val = tap->val;
     tap->val = *tap->buffer++;
@@ -154,40 +155,50 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
     if (tap->increasing != tap->prev_increasing) /* A min or max has been reached. Is it a true one? */
     {
       if (tap->increasing
-          && (tap->triggered==TRIGGERED || tap->input_pos - tap->max > tap->min_duration)
+          && (tap->triggered==FALLING_EDGE_HAPPENED || tap->input_pos - tap->max > tap->min_duration)
           && tap->max_val > tap->prev_val
           && (u_int32_t)(tap->max_val-tap->prev_val) > tap->min_height){ /* A minimum */
         tap->min = tap->input_pos;
         tap->min_val = tap->prev_val;
-        if (tap->triggered==WAITING_FOR_FALLING_EDGE)
-          event=FALLING_EDGE_HAPPENED;
-        tap->triggered=WAITING_FOR_RISING_EDGE;
-        tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        if (tap->triggered==WAITING_FOR_FALLING_EDGE){
+          event=FALLING_EDGE_HAPPENED_NOW;
+          tap->triggered=WAITING_FOR_RISING_EDGE;
+          tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        }
+        else if (tap->triggered==FALLING_EDGE_HAPPENED){
+           tap->triggered=WAITING_FOR_RISING_EDGE;
+           tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        }
       }
       else if (!tap->increasing
-           && (tap->triggered==TRIGGERED || tap->input_pos - tap->min > tap->min_duration)
+           && (tap->triggered==RISING_EDGE_HAPPENED || tap->input_pos - tap->min > tap->min_duration)
            && tap->prev_val > tap->min_val
            && (u_int32_t)(tap->prev_val-tap->min_val) > tap->min_height){ /* A maximum */
         tap->max = tap->input_pos;
         tap->max_val = tap->prev_val;
-        if (tap->triggered==WAITING_FOR_RISING_EDGE)
-          event=RISING_EDGE_HAPPENED;
-        tap->triggered=WAITING_FOR_FALLING_EDGE;
-        tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        if (tap->triggered==WAITING_FOR_RISING_EDGE){
+          event=RISING_EDGE_HAPPENED_NOW;
+          tap->triggered=WAITING_FOR_FALLING_EDGE;
+          tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        }
+        else if (tap->triggered==RISING_EDGE_HAPPENED){
+          tap->triggered=WAITING_FOR_FALLING_EDGE;
+          tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        }
       }
     }
 
     if (tap->triggered == WAITING_FOR_RISING_EDGE && tap->val > tap->trigger_val){
-      tap->triggered=TRIGGERED;
-      event = RISING_EDGE_HAPPENED;
+      tap->triggered=RISING_EDGE_HAPPENED;
+      event = RISING_EDGE_HAPPENED_NOW;
     }
     if (tap->triggered == WAITING_FOR_FALLING_EDGE && tap->val < tap->trigger_val){
-      tap->triggered=TRIGGERED;
-      event = FALLING_EDGE_HAPPENED;
+      tap->triggered=FALLING_EDGE_HAPPENED;
+      event = FALLING_EDGE_HAPPENED_NOW;
     }
     
-    if ( ( tap->inverted && event == FALLING_EDGE_HAPPENED)
-      || (!tap->inverted && event ==  RISING_EDGE_HAPPENED)
+    if ( ( tap->inverted && event == FALLING_EDGE_HAPPENED_NOW)
+      || (!tap->inverted && event ==  RISING_EDGE_HAPPENED_NOW)
        )
     {
       u_int32_t found_pulse = ( (tap->input_pos - tap->prev_trigger)*tap->factor);
