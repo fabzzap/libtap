@@ -5,4 +5,4 @@ clean:
 	rm -f tap.dll tap.lib *~ *.so
 
 libtap.so: tap.c
-	$(CC) $(CFLAGS) -shared -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -shared -o $@ $^ $(LDFLAGS) -lm
