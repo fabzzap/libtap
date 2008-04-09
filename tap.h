@@ -36,8 +36,7 @@ struct tap_t *tap_toaudio_init(u_int32_t outfreq, int32_t volume, int inverted);
 void tap_set_buffer(struct tap_t *tap, int32_t *buf, int len);
 int tap_set_machine(struct tap_t *tap, unsigned char machine, unsigned char videotype);
 u_int32_t tap_get_pulse(struct tap_t *tap);
-void tap_flush(struct tap_t *tap);
-u_int8_t tap_is_flushing(struct tap_t *tap);
+u_int32_t tap_flush(struct tap_t *tap);
     
 int tap_get_pos(struct tap_t *tap);void tap_exit(struct tap_t *tap);
 void tap_set_pulse(struct tap_t *tap, u_int32_t pulse);

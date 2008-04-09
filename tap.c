@@ -52,7 +52,6 @@ struct tap_t{
   u_int32_t to_be_consumed, this_pulse_len;
   float factor;
   u_int32_t overflow_samples;
-  u_int8_t flushing;
   enum trigger_state triggered;
 };
 
@@ -100,7 +99,6 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->machine=TAP_MACHINE_C64;
   tap->videotype=TAP_VIDEOTYPE_PAL;
   set_factor(tap);
-  tap->flushing=0;
   return tap;
 }
 
@@ -146,7 +144,6 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
     
     tap->prev_val = tap->val;
     tap->val = *tap->buffer++;
-    tap->input_pos++;
 
     tap->prev_increasing = tap->increasing;
     if (tap->val == tap->prev_val) tap->increasing = tap->prev_increasing;
@@ -205,7 +202,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
       tap->prev_trigger = tap->input_pos;
       return found_pulse % OVERFLOW_VALUE;
     }
-    if ( ((tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == 0)
+    if ( ((++tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == 0)
     {      
       return OVERFLOW_VALUE;
     }
@@ -217,12 +214,8 @@ int tap_get_pos(struct tap_t *tap){
   return tap->input_pos - 2;
 }
     
-void tap_flush(struct tap_t *tap){
-  tap->flushing = 1;
-}
-
-u_int8_t tap_is_flushing(struct tap_t *tap){
-  return tap->flushing;
+u_int32_t tap_flush(struct tap_t *tap){
+  return ((u_int32_t)( (tap->input_pos - tap->prev_trigger)*tap->factor) ) % OVERFLOW_VALUE;
 }
 
 int32_t tap_get_max(struct tap_t *tap){
@@ -230,11 +223,9 @@ int32_t tap_get_max(struct tap_t *tap){
 }
 
 void tap_set_pulse(struct tap_t *tap, u_int32_t pulse){
-  if (tap->val < 0)
-    tap->val = -tap->val;
   tap->this_pulse_len=
     tap->to_be_consumed=
-    (pulse/(float)tap->factor)+1;
+    (pulse/(float)tap->factor);
 }
 
 static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){

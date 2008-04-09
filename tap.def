@@ -12,6 +12,4 @@ EXPORTS
 	tap_set_pulse                
 	tap_get_buffer               
 	tap_flush
-	tap_is_flushing
 	tap_exit                     
-
