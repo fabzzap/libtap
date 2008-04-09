@@ -23,10 +23,12 @@
 #include <stddef.h>
 #include <malloc.h>
 #include <sys/types.h>
+/*Visual Studio does not define M_PI otherwise*/
+#ifdef _MSC_VER
+#define _USE_MATH_DEFINES
+#endif
 #include <math.h>
 #include "tap.h"
-
-#define MIN(a,b) ( (a) < (b) ? (a) : (b) )
 
 #define OVERFLOW_VALUE (TAP_NO_MORE_SAMPLES - 1)
 
@@ -52,6 +54,7 @@ struct tap_t{
   u_int32_t to_be_consumed, this_pulse_len;
   float factor;
   u_int32_t overflow_samples;
+  char has_overflowed;
   enum trigger_state triggered;
 };
 
@@ -98,6 +101,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->inverted=inverted;
   tap->machine=TAP_MACHINE_C64;
   tap->videotype=TAP_VIDEOTYPE_PAL;
+  tap->has_overflowed=0;
   set_factor(tap);
   return tap;
 }
@@ -142,6 +146,14 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
       FALLING_EDGE_HAPPENED_NOW
     } event = NOTHING_HAPPENED_NOW;
     
+    if ( ((tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == (tap->overflow_samples - 1))
+    {
+      tap->has_overflowed = ~tap->has_overflowed;
+      if (tap->has_overflowed)
+        return OVERFLOW_VALUE;
+    }
+
+    tap->input_pos++;
     tap->prev_val = tap->val;
     tap->val = *tap->buffer++;
 
@@ -198,13 +210,9 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
       || (!tap->inverted && event ==  RISING_EDGE_HAPPENED_NOW)
        )
     {
-      u_int32_t found_pulse = ( (tap->input_pos - tap->prev_trigger)*tap->factor);
-      tap->prev_trigger = tap->input_pos;
+      u_int32_t found_pulse = ( (tap->input_pos - tap->prev_trigger - 1)*tap->factor);
+      tap->prev_trigger = tap->input_pos - 1;
       return found_pulse % OVERFLOW_VALUE;
-    }
-    if ( ((++tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == 0)
-    {      
-      return OVERFLOW_VALUE;
     }
   }
   return TAP_NO_MORE_SAMPLES;
@@ -235,17 +243,16 @@ static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_
 }
 
 static int32_t tap_get_sine_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
-    return volume*sin(to_be_consumed*2*M_PI/this_pulse_len);
+    return -volume*sin(to_be_consumed*2*M_PI/this_pulse_len);
 }
 
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
     int samples_done = 0;
 
     while(buflen > 0 && tap->to_be_consumed > 0){
-        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed, tap->val)*(tap->inverted ? -1 : 1);
-        samples_done += 1;
-        tap->to_be_consumed -= 1;
-        buflen -= 1;
+        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
+        samples_done++;
+        buflen--;
     }
 
     return samples_done;
