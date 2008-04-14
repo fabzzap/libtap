@@ -95,7 +95,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->min=0;
   tap->trigger_val=0;
   tap->triggered=RISING_EDGE_HAPPENED;
-  tap->prev_trigger=0;
+  tap->prev_trigger=-1;
   tap->max_val=2147483647;
   tap->min_val=-2147483647;
   tap->inverted=inverted;
@@ -146,7 +146,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
       FALLING_EDGE_HAPPENED_NOW
     } event = NOTHING_HAPPENED_NOW;
     
-    if ( ((tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == (tap->overflow_samples - 1))
+    if ( ((tap->input_pos - tap->prev_trigger) % tap->overflow_samples) == 0)
     {
       tap->has_overflowed = ~tap->has_overflowed;
       if (tap->has_overflowed)
@@ -223,7 +223,7 @@ int tap_get_pos(struct tap_t *tap){
 }
     
 u_int32_t tap_flush(struct tap_t *tap){
-  return ((u_int32_t)( (tap->input_pos - tap->prev_trigger)*tap->factor) ) % OVERFLOW_VALUE;
+  return ((u_int32_t)( (tap->input_pos - tap->prev_trigger - 1)*tap->factor) ) % OVERFLOW_VALUE;
 }
 
 int32_t tap_get_max(struct tap_t *tap){
@@ -250,7 +250,7 @@ u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen
     int samples_done = 0;
 
     while(buflen > 0 && tap->to_be_consumed > 0){
-        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
+        *buffer++ = tap_get_sine_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
         samples_done++;
         buflen--;
     }
