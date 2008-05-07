@@ -23,11 +23,6 @@
 #include <stddef.h>
 #include <malloc.h>
 #include <sys/types.h>
-/*Visual Studio does not define M_PI otherwise*/
-#ifdef _MSC_VER
-#define _USE_MATH_DEFINES
-#endif
-#include <math.h>
 #include "tap.h"
 
 #define OVERFLOW_VALUE (TAP_NO_MORE_SAMPLES - 1)
@@ -171,10 +166,8 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
         tap->min_val = tap->prev_val;
         if (tap->triggered==WAITING_FOR_FALLING_EDGE){
           event=FALLING_EDGE_HAPPENED_NOW;
-          tap->triggered=WAITING_FOR_RISING_EDGE;
-          tap->trigger_val = tap->min_val/2 + tap->max_val/2;
         }
-        else if (tap->triggered==FALLING_EDGE_HAPPENED){
+        if (tap->triggered!=RISING_EDGE_HAPPENED){
            tap->triggered=WAITING_FOR_RISING_EDGE;
            tap->trigger_val = tap->min_val/2 + tap->max_val/2;
         }
@@ -187,10 +180,9 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
         tap->max_val = tap->prev_val;
         if (tap->triggered==WAITING_FOR_RISING_EDGE){
           event=RISING_EDGE_HAPPENED_NOW;
-          tap->triggered=WAITING_FOR_FALLING_EDGE;
-          tap->trigger_val = tap->min_val/2 + tap->max_val/2;
         }
-        else if (tap->triggered==RISING_EDGE_HAPPENED){
+        if (tap->triggered!=FALLING_EDGE_HAPPENED)
+        {
           tap->triggered=WAITING_FOR_FALLING_EDGE;
           tap->trigger_val = tap->min_val/2 + tap->max_val/2;
         }
@@ -242,15 +234,11 @@ static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_
     return -volume;
 }
 
-static int32_t tap_get_sine_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
-    return -volume*sin(to_be_consumed*2*M_PI/this_pulse_len);
-}
-
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
     int samples_done = 0;
 
     while(buflen > 0 && tap->to_be_consumed > 0){
-        *buffer++ = tap_get_sine_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
+        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
         samples_done++;
         buflen--;
     }
