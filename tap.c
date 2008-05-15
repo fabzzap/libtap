@@ -41,7 +41,7 @@ struct tap_t{
   u_int32_t input_pos;
   u_int32_t freq;
   u_int32_t min_duration;
-  u_int32_t min_height;
+  int32_t min_height;
   int32_t *buffer, *bufstart, *bufend, val, prev_val, max_val, min_val, trigger_val;
   u_int32_t max, min, prev_trigger;
   int inverted;
@@ -51,6 +51,7 @@ struct tap_t{
   u_int32_t overflow_samples;
   char has_overflowed;
   enum trigger_state triggered;
+  u_int8_t sensitivity;
 };
 
 const float tap_clocks[][2]={
@@ -81,7 +82,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->input_pos=0;
   tap->freq=infreq;
   tap->min_duration=min_duration;
-  tap->min_height=min_height;
+  tap->min_height=0;
   tap->buffer=NULL;
   tap->bufstart=NULL;
   tap->bufend=NULL;
@@ -97,6 +98,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->machine=TAP_MACHINE_C64;
   tap->videotype=TAP_VIDEOTYPE_PAL;
   tap->has_overflowed=0;
+  tap->sensitivity=min_height > 100 ? 100 : min_height;
   set_factor(tap);
   return tap;
 }
@@ -160,8 +162,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
     {
       if (tap->increasing
           && (tap->triggered==FALLING_EDGE_HAPPENED || tap->input_pos - tap->max > tap->min_duration)
-          && tap->max_val > tap->prev_val
-          && (u_int32_t)(tap->max_val-tap->prev_val) > tap->min_height){ /* A minimum */
+          && tap->min_height > tap->prev_val){ /* A minimum */
         tap->min = tap->input_pos;
         tap->min_val = tap->prev_val;
         if (tap->triggered==WAITING_FOR_FALLING_EDGE){
@@ -170,12 +171,12 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
         if (tap->triggered!=RISING_EDGE_HAPPENED){
            tap->triggered=WAITING_FOR_RISING_EDGE;
            tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+           tap->min_height = tap->min_val/200*(100+tap->sensitivity) + tap->max_val/200*(100-tap->sensitivity);
         }
       }
       else if (!tap->increasing
            && (tap->triggered==RISING_EDGE_HAPPENED || tap->input_pos - tap->min > tap->min_duration)
-           && tap->prev_val > tap->min_val
-           && (u_int32_t)(tap->prev_val-tap->min_val) > tap->min_height){ /* A maximum */
+           && tap->prev_val > tap->min_height){ /* A maximum */
         tap->max = tap->input_pos;
         tap->max_val = tap->prev_val;
         if (tap->triggered==WAITING_FOR_RISING_EDGE){
@@ -185,6 +186,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
         {
           tap->triggered=WAITING_FOR_FALLING_EDGE;
           tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+          tap->min_height = tap->min_val/200*(100-tap->sensitivity) + tap->max_val/200*(100+tap->sensitivity);
         }
       }
     }
