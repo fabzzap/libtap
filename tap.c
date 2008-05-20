@@ -82,7 +82,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->input_pos=0;
   tap->freq=infreq;
   tap->min_duration=min_duration;
-  tap->min_height=0;
+  tap->min_height=-(10<<24);
   tap->buffer=NULL;
   tap->bufstart=NULL;
   tap->bufend=NULL;
@@ -93,7 +93,7 @@ struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int
   tap->triggered=RISING_EDGE_HAPPENED;
   tap->prev_trigger=0;
   tap->max_val=2147483647;
-  tap->min_val=-2147483647;
+  tap->min_val=-(20<<24);
   tap->inverted=inverted;
   tap->machine=TAP_MACHINE_C64;
   tap->videotype=TAP_VIDEOTYPE_PAL;
