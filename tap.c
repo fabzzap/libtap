@@ -161,33 +161,38 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
     if (tap->increasing != tap->prev_increasing) /* A min or max has been reached. Is it a true one? */
     {
       if (tap->increasing
-          && (tap->triggered==FALLING_EDGE_HAPPENED || tap->input_pos - tap->max > tap->min_duration)
+          && (tap->triggered==FALLING_EDGE_HAPPENED ||
+              (
+               tap->triggered==WAITING_FOR_FALLING_EDGE
+               && tap->input_pos - tap->max > tap->min_duration
+              )
+          )
           && tap->min_height > tap->prev_val){ /* A minimum */
         tap->min = tap->input_pos;
         tap->min_val = tap->prev_val;
         if (tap->triggered==WAITING_FOR_FALLING_EDGE){
           event=FALLING_EDGE_HAPPENED_NOW;
         }
-        if (tap->triggered!=RISING_EDGE_HAPPENED){
-           tap->triggered=WAITING_FOR_RISING_EDGE;
-           tap->trigger_val = tap->min_val/2 + tap->max_val/2;
-           tap->min_height = tap->min_val/200*(100+tap->sensitivity) + tap->max_val/200*(100-tap->sensitivity);
-        }
+        tap->triggered=WAITING_FOR_RISING_EDGE;
+        tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        tap->min_height = tap->min_val/200*(100+tap->sensitivity) + tap->max_val/200*(100-tap->sensitivity);
       }
       else if (!tap->increasing
-           && (tap->triggered==RISING_EDGE_HAPPENED || tap->input_pos - tap->min > tap->min_duration)
+           && (tap->triggered==RISING_EDGE_HAPPENED ||
+               (
+                tap->triggered==WAITING_FOR_RISING_EDGE
+                && tap->input_pos - tap->min > tap->min_duration
+               )
+              )
            && tap->prev_val > tap->min_height){ /* A maximum */
         tap->max = tap->input_pos;
         tap->max_val = tap->prev_val;
         if (tap->triggered==WAITING_FOR_RISING_EDGE){
           event=RISING_EDGE_HAPPENED_NOW;
         }
-        if (tap->triggered!=FALLING_EDGE_HAPPENED)
-        {
-          tap->triggered=WAITING_FOR_FALLING_EDGE;
-          tap->trigger_val = tap->min_val/2 + tap->max_val/2;
-          tap->min_height = tap->min_val/200*(100-tap->sensitivity) + tap->max_val/200*(100+tap->sensitivity);
-        }
+        tap->triggered=WAITING_FOR_FALLING_EDGE;
+        tap->trigger_val = tap->min_val/2 + tap->max_val/2;
+        tap->min_height = tap->min_val/200*(100-tap->sensitivity) + tap->max_val/200*(100+tap->sensitivity);
       }
     }
 
