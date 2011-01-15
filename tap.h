@@ -1,9 +1,9 @@
 /* TAP shared library: a library for converting audio data (as a stream of
  * PCM signed 32-bit samples, mono) to raw TAP data and back
- * 
+ *
  * TAP specification was written by Per Håkan Sundell and is available at
  * http://www.computerbrains.com/tapformat.html
- * 
+ *
  * The algorithm for TAP encoding was originally written by Janne Veli
  * Kujala, based on the one written by Andreas Matthies for Tape64.
  * Some modifications and adaptation to library format by Fabrizio Gennari
@@ -33,11 +33,13 @@ struct tap_t;
 
 struct tap_t *tap_fromaudio_init(u_int32_t infreq, u_int32_t min_duration, u_int32_t min_height, int inverted);
 struct tap_t *tap_toaudio_init(u_int32_t outfreq, int32_t volume, int inverted);
+struct tap_t *tap_fromaudio_init_with_machine(u_int32_t infreq, u_int32_t min_duration, u_int32_t min_height, int inverted, u_int8_t machine, u_int8_t videotype);
+struct tap_t *tap_toaudio_init_with_machine(u_int32_t outfreq, int32_t volume, int inverted, u_int8_t machine, u_int8_t videotype);
 void tap_set_buffer(struct tap_t *tap, int32_t *buf, int len);
 int tap_set_machine(struct tap_t *tap, unsigned char machine, unsigned char videotype);
 u_int32_t tap_get_pulse(struct tap_t *tap);
 u_int32_t tap_flush(struct tap_t *tap);
-    
+
 int tap_get_pos(struct tap_t *tap);void tap_exit(struct tap_t *tap);
 void tap_set_pulse(struct tap_t *tap, u_int32_t pulse);
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen);
