@@ -252,11 +252,15 @@ static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_
     return -volume;
 }
 
+static int32_t tap_get_sawtooth_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
+    return volume*(int64_t)(int32_t)(2*to_be_consumed-this_pulse_len-1)/(int32_t)(this_pulse_len-1);
+}
+
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
     int samples_done = 0;
 
     while(buflen > 0 && tap->to_be_consumed > 0){
-        *buffer++ = tap_get_squarewave_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
+        *buffer++ = tap_get_sawtooth_val(tap->this_pulse_len, tap->to_be_consumed--, tap->val)*(tap->inverted ? -1 : 1);
         samples_done++;
         buflen--;
     }
