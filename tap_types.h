@@ -44,6 +44,7 @@
 typedef int int32_t;
 typedef unsigned int u_int32_t;
 typedef unsigned char u_int8_t;
+typedef long long int64_t;
 #endif
 
 #endif /* TAP_TYPES_H_INCLUDED */

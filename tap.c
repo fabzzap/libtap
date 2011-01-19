@@ -54,7 +54,7 @@ const float tap_clocks[][2]={
 
 static void set_factor(struct tap_t *tap, u_int32_t freq){
   tap->factor = tap_clocks[tap->machine][tap->videotype]/(float)freq;
-  tap->overflow_samples = OVERFLOW_VALUE/tap->factor - 10;
+  tap->overflow_samples = (u_int32_t)(OVERFLOW_VALUE/tap->factor) - 10;
 
   /*overcome imprecision of float arithmetics*/
   do
@@ -84,7 +84,7 @@ struct tap_t *tap_fromaudio_init_with_machine(u_int32_t infreq, u_int32_t min_du
   tap->min=0;
   tap->prev_max=0;
   tap->prev_min=0;
-  tap->trigger_pos=1;
+  tap->trigger_pos=0;
   tap->max_val=-(20<<24);
   tap->min_val=-(20<<24);
   tap->inverted=inverted;
@@ -151,7 +151,7 @@ u_int32_t tap_get_pulse(struct tap_t *tap){
       else{
         u_int32_t samples_to_process_now = tap->samples_still_to_process;
         tap->samples_still_to_process = 0;
-        return samples_to_process_now * tap->factor;
+        return (u_int32_t)(samples_to_process_now * tap->factor);
       }
     }
 
@@ -243,7 +243,7 @@ int32_t tap_get_max(struct tap_t *tap){
 void tap_set_pulse(struct tap_t *tap, u_int32_t pulse){
   tap->this_pulse_len=
     tap->to_be_consumed=
-    (pulse/(float)tap->factor);
+    (u_int32_t)(pulse/(float)tap->factor);
 }
 
 static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
@@ -255,7 +255,9 @@ static int32_t tap_get_squarewave_val(u_int32_t this_pulse_len, u_int32_t to_be_
 static int32_t tap_get_sawtooth_val(u_int32_t this_pulse_len, u_int32_t to_be_consumed, int32_t volume){
   /* Double cast! Don't ask. OK, it has something to do with signedness and something with
      multiplication giving results too large to fit in 32 bits */
-  return volume*(int64_t)(int32_t)(2*to_be_consumed-this_pulse_len-1)/(this_pulse_len-1);
+  if (this_pulse_len <= 1)
+    return 0;
+  return (int32_t)(volume*(int64_t)(int32_t)(2*to_be_consumed-this_pulse_len-1)/(this_pulse_len-1));
 }
 
 u_int32_t tap_get_buffer(struct tap_t *tap, int32_t *buffer, unsigned int buflen){
