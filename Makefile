@@ -1,8 +1,16 @@
-tap.dll: tap.c tap.def
-	$(CC) $(CFLAGS) -shared -Wl,--out-implib=tap.lib -o $@ $^ $(LDFLAGS)
+all: tap.dll
+
+ifdef WITH_SINE
+  ADD_CFLAGS=-DHAVE_SINE_WAVE
+  ADD_LDFLAGS=-lm
+endif
+
+%.dll: %.c %.def
+	$(CC) $(CFLAGS) -shared -Wl,--out-implib=%.lib -o $@ $^ $(LDFLAGS)
 
 clean:
 	rm -f tap.dll tap.lib *~ *.so
 
-libtap.so: tap.c
-	$(CC) $(CFLAGS) -shared -o $@ $^ $(LDFLAGS) -lm
+lib%.so: %.c
+	$(CC) $(CFLAGS) $(ADD_CFLAGS) -shared -o $@ $^ $(LDFLAGS) $(ADD_LDFLAGS)
+
