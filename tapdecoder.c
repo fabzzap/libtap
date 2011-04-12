@@ -17,8 +17,11 @@
 #include <malloc.h>
 #include <sys/types.h>
 #ifdef HAVE_SINE_WAVE
+#ifdef _MSC_VER
+#define _USE_MATH_DEFINES
+#endif /* _MSC_VER*/
 #include <math.h>
-#endif
+#endif /*HAVE_SINE_WAVE*/
 #include "tapdecoder.h"
 
 
@@ -30,22 +33,19 @@ struct tap_dec_t{
 };
 
 static int32_t tap_get_triangle_val(uint32_t to_be_consumed, uint32_t this_pulse_len, uint32_t volume){
-  /* Double cast! Don't ask. OK, it has something to do with signedness and something with
-     multiplication giving results too large to fit in 32 bits */
-  to_be_consumed++;
-  if (to_be_consumed > this_pulse_len / 2)
-    to_be_consumed = this_pulse_len - to_be_consumed;
-  {
-    int64_t in = ((int64_t)to_be_consumed)*volume*2;
-    int64_t inn= in /this_pulse_len;
-    return (int32_t)inn;
-  }
+  int64_t in;
+
+  to_be_consumed = (to_be_consumed < this_pulse_len / 2) ?
+    to_be_consumed + 1 :
+    this_pulse_len - 1 - to_be_consumed;
+  in = ((int64_t)to_be_consumed)*volume*2;
+  return (int32_t)(in / this_pulse_len);
 }
 
 #ifdef HAVE_SINE_WAVE
 static int32_t tap_get_sinewave_val(uint32_t to_be_consumed, uint32_t this_pulse_len, uint32_t volume){
   double angle=(M_PI*(to_be_consumed+1))/this_pulse_len;
-  return volume*sin(angle);
+  return (int32_t)(volume*sin(angle));
 }
 #endif
 
