@@ -70,13 +70,13 @@ static uint32_t tap_semiwave(struct tap_dec_t *tap, int32_t **buffer, uint32_t *
   return samples_done;
 }  
 
-struct tap_dec_t *tapdec_init(uint32_t volume, enum tap_trigger trigger_type, enum tapdec_waveform waveform){
+struct tap_dec_t *tapdec_init(uint8_t volume, enum tap_trigger trigger_type, enum tapdec_waveform waveform){
   struct tap_dec_t *tap;
 
   tap=malloc(sizeof(struct tap_dec_t));
   if (tap==NULL) return NULL;
   tap->trigger_type=trigger_type;
-  tap->volume=volume;
+  tap->volume=volume<<23;
   tap->negative=trigger_type==TAP_TRIGGER_ON_FALLING_EDGE;
   switch (waveform){
   case TAPDEC_TRIANGLE:
@@ -85,6 +85,7 @@ struct tap_dec_t *tapdec_init(uint32_t volume, enum tap_trigger trigger_type, en
     break;
   case TAPDEC_SQUARE:
     tap->get_val = tap_get_squarewave_val;
+    break;
 #ifdef HAVE_SINE_WAVE
   case TAPDEC_SINE:
     tap->get_val = tap_get_sinewave_val;
