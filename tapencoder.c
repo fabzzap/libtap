@@ -14,9 +14,7 @@
  * See file LESSER-LICENSE.TXT for details.
  */
 
-#include <stddef.h>
-#include <malloc.h>
-#include <sys/types.h>
+#include <stdlib.h>
 #include "tapencoder.h"
 
 struct tap_enc_t{

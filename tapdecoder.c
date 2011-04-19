@@ -13,8 +13,7 @@
  * See file LESSER-LICENSE.TXT for details.
  */
 
-#include <stddef.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #ifdef HAVE_SINE_WAVE
 #ifdef _MSC_VER
