@@ -1,4 +1,4 @@
-LIBRARY	"libtapencoder"
+LIBRARY	"tapencoder"
 EXPORTS
 tapenc_init
 tapenc_get_pulse

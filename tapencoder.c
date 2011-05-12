@@ -82,7 +82,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
   while(!(*got_pulse) && samples_done < buflen){
     if(tap->anomalous_trigger){
       tap->anomalous_trigger = 0;
-      *pulse = set_trigger(tap->input_pos, &tap->trigger_pos, got_pulse);
+      *pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, got_pulse);
       break;
     }
     tap->prev_val = tap->val;

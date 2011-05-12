@@ -1,4 +1,4 @@
-LIBRARY	"libtapdecoder"
+LIBRARY	"tapdecoder"
 EXPORTS
 tapdec_init
 tapdec_set_pulse
