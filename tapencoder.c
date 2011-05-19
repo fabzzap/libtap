@@ -60,12 +60,21 @@ static void reset_state(struct tap_enc_t *tap){
   tap->old_anomaly = NULL;
 }
 
-static uint32_t set_trigger(uint32_t trigger_pos, uint32_t *stored_trigger_pos, uint8_t *got_pulse) {
-  uint32_t return_value;
+static uint8_t set_trigger(uint32_t trigger_pos
+                          ,uint32_t *stored_trigger_pos
+                          ,uint8_t rising
+                          ,enum tap_trigger trigger_type
+                          ,uint32_t *pulse) {
+  uint8_t return_value = 0;
 
-  *got_pulse = 1;
-  return_value = trigger_pos - *stored_trigger_pos;
-  *stored_trigger_pos = trigger_pos;
+  if(
+    (!rising && trigger_type != TAP_TRIGGER_ON_RISING_EDGE)
+ || ( rising && trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
+    ){
+    return_value = 1;
+    *pulse = trigger_pos - *stored_trigger_pos;
+    *stored_trigger_pos = trigger_pos;
+  }
   return return_value;
 }
 
@@ -103,14 +112,17 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
 
   while(!(*got_pulse)){
     if(tap->cached_trigger){
-      tap->cached_trigger = 0;
-      if(
-         (tap->min > tap->max && tap->trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
-      || (tap->min < tap->max && tap->trigger_type != TAP_TRIGGER_ON_RISING_EDGE)
-        ){
-        *pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, got_pulse);
-        break;
+      if(tap->anomaly){
+        *got_pulse = set_trigger(tap->anomaly->pos, &tap->trigger_pos, tap->anomaly->rising, tap->trigger_type, pulse);
+        free(tap->anomaly);
+        tap->anomaly = NULL;
       }
+      else{
+        *got_pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, tap->min > tap->max, tap->trigger_type, pulse);
+        tap->cached_trigger = 0;
+      }
+      if (*got_pulse)
+        break;
     }
     if(samples_done >= buflen)
       break;
@@ -201,11 +213,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
         tap->old_anomaly = tap->anomaly;
         tap->anomaly = NULL;
       }
-      if(
-         (!tap->old_anomaly->rising && tap->trigger_type != TAP_TRIGGER_ON_RISING_EDGE)
-      || ( tap->old_anomaly->rising && tap->trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
-         )
-        *pulse = set_trigger(tap->old_anomaly->pos, &tap->trigger_pos, got_pulse);
+      *got_pulse = set_trigger(tap->old_anomaly->pos, &tap->trigger_pos, tap->old_anomaly->rising, tap->trigger_type, pulse);
       free(tap->old_anomaly);
       tap->old_anomaly = NULL;
     }
