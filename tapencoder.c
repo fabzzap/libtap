@@ -97,7 +97,9 @@ static void set_anomaly(struct tap_enc_t *tap, uint32_t prev_minmax, uint8_t ris
   struct anomalies *anomaly = malloc(sizeof(struct anomalies));
 
   anomaly->resolution_level = tap->trigger_level;
-  anomaly->pos = tap->input_pos / 2 + prev_minmax / 2;
+  anomaly->pos = tap->input_pos / 2 + prev_minmax / 2
+    /* avoid rounding errors when both are odd */
+    + ((tap->input_pos & 1) & (prev_minmax & 1));
   anomaly->rising = rising;
 
   if(tap->anomaly != NULL)
