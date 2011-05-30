@@ -141,7 +141,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
     if (tap->increasing != tap->prev_increasing) /* A min or max has been reached. Is it a true one? */
     {
       if (tap->increasing
-       && tap->input_pos - tap->max > tap->min_duration
+       && (tap->input_pos - tap->max > tap->min_duration || tap->triggered)
        && tap->min_height > tap->prev_val
        && (tap->max>tap->min || tap->min_val > tap->prev_val) ){ /* A minimum */
         if (tap->max >= tap->min) {
@@ -161,7 +161,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
             : tap->initial_threshold<<24;
       }
       else if (!tap->increasing
-             && tap->input_pos - tap->min > tap->min_duration
+             && (tap->input_pos - tap->min > tap->min_duration || tap->triggered)
              && tap->prev_val > tap->min_height
              && (tap->min>tap->max || tap->prev_val > tap->max_val) ){ /* A maximum */
         if (tap->min >= tap->max) {

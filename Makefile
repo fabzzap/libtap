@@ -1,8 +1,8 @@
 all: tapencoder.dll tapdecoder.dll
 
 ifdef WITH_SINE
-  ADD_CFLAGS+=-DHAVE_SINE_WAVE
-  libtapencoder.so:ADD_LDFLAGS=-lm
+  libtapdecoder.so:ADD_CFLAGS+=-DHAVE_SINE_WAVE
+  libtapdecoder.so:ADD_LDFLAGS=-lm
 endif
 
 %.dll:ADD_CFLAGS+=-Wl,--out-implib=$*.lib
