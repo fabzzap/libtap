@@ -42,7 +42,10 @@ struct tap_enc_t{
 static void reset_state(struct tap_enc_t *tap){
   tap->increasing=0;
   tap->input_pos=0;
-  tap->min_height=0;
+  /* When creating semiwaves, the first trigger must be after the first max,
+     else the TAP won't work with VICE. This ensures that the first min
+     comes after the first max */
+  tap->min_height= tap->trigger_type != TAP_TRIGGER_ON_BOTH_EDGES ? 0 : 1<<31;
   tap->val=0;
   tap->max=0;
   tap->min=0;
@@ -150,11 +153,11 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
           else
             tap->triggered = 0;
           tap->prev_min = tap->min;
+          tap->min = tap->input_pos;
         }
         tap->trigger_level = tap->max > 0 ?
           tap->prev_val / 2 + tap->max_val / 2
           : 0;
-        tap->min = tap->input_pos;
         tap->min_val = tap->prev_val;
         tap->min_height = tap->max>0 ?
         tap->min_val/200*(100+tap->sensitivity) + tap->max_val/200*(100-tap->sensitivity)
@@ -170,11 +173,11 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
           else
             tap->triggered = 0;
           tap->prev_max = tap->max;
+          tap->max = tap->input_pos;
         }
         tap->trigger_level =  tap->min > 0 ?
           tap->prev_val / 2 + tap->min_val / 2
           : 0;
-        tap->max = tap->input_pos;
         tap->max_val = tap->prev_val;
         tap->min_height = tap->min>0 ?
         tap->min_val/200*(100-tap->sensitivity) + tap->max_val/200*(100+tap->sensitivity)
