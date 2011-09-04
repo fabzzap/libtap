@@ -25,7 +25,7 @@
 
 
 struct tap_dec_t{
-  enum tap_trigger trigger_type;
+  uint8_t semiwaves;
   uint32_t first_consumed, second_consumed, first_semiwave, second_semiwave, volume;
   unsigned char negative;
   int32_t (*get_val)(uint32_t to_be_consumed, uint32_t this_pulse_len, uint32_t volume);
@@ -69,14 +69,14 @@ static uint32_t tap_semiwave(struct tap_dec_t *tap, int32_t **buffer, uint32_t *
   return samples_done;
 }  
 
-struct tap_dec_t *tapdec_init(uint8_t volume, enum tap_trigger trigger_type, enum tapdec_waveform waveform){
+struct tap_dec_t *tapdecoder_init(uint8_t volume, uint8_t inverted, uint8_t semiwaves, enum tapdec_waveform waveform){
   struct tap_dec_t *tap;
 
   tap=malloc(sizeof(struct tap_dec_t));
   if (tap==NULL) return NULL;
-  tap->trigger_type=trigger_type;
+  tap->semiwaves=semiwaves;
   tap->volume=volume<<23;
-  tap->negative=trigger_type==TAP_TRIGGER_ON_FALLING_EDGE;
+  tap->negative=inverted;
   switch (waveform){
   case TAPDEC_TRIANGLE:
   default:
@@ -97,10 +97,9 @@ struct tap_dec_t *tapdec_init(uint8_t volume, enum tap_trigger trigger_type, enu
 
 void tapdec_set_pulse(struct tap_dec_t *tap, uint32_t pulse){
   tap->first_consumed=tap->second_consumed=0;
-  if (pulse==1 && tap->trigger_type!=TAP_TRIGGER_ON_BOTH_EDGES)
+  if (pulse==1 && !tap->semiwaves)
     pulse=0;
-  tap->second_semiwave = 
-    tap->trigger_type!=TAP_TRIGGER_ON_BOTH_EDGES ? pulse / 2 : 0;
+  tap->second_semiwave = tap->semiwaves ? 0 : pulse / 2;
   tap->first_semiwave=pulse - tap->second_semiwave;
 }
 

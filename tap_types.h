@@ -20,17 +20,10 @@
 #ifndef TAP_TYPES_H
 #define TAP_TYPES_H
 
-enum tap_trigger {
-  TAP_TRIGGER_ON_RISING_EDGE,
-  TAP_TRIGGER_ON_FALLING_EDGE,
-  TAP_TRIGGER_ON_BOTH_EDGES
-};
-
 enum tapdec_waveform {
   TAPDEC_TRIANGLE,
   TAPDEC_SQUARE,
   TAPDEC_SINE
 };
-
 
 #endif /* TAP_TYPES_H */

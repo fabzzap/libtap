@@ -23,6 +23,12 @@ struct anomalies{
   uint8_t rising;
 };
 
+enum tap_trigger {
+  TAP_TRIGGER_ON_RISING_EDGE,
+  TAP_TRIGGER_ON_FALLING_EDGE,
+  TAP_TRIGGER_ON_BOTH_EDGES
+};
+
 struct tap_enc_t{
   uint32_t increasing;
   uint32_t prev_increasing;
@@ -36,6 +42,7 @@ struct tap_enc_t{
   enum tap_trigger trigger_type;
   uint8_t initial_threshold;
   uint8_t triggered, cached_trigger;
+  uint8_t start_with_positive_semiwave;
   struct anomalies *anomaly, *old_anomaly;
 };
 
@@ -45,7 +52,8 @@ static void reset_state(struct tap_enc_t *tap){
   /* When creating semiwaves, the first trigger must be after the first max,
      else the TAP won't work with VICE. This ensures that the first min
      comes after the first max */
-  tap->min_height= tap->trigger_type != TAP_TRIGGER_ON_BOTH_EDGES ? 0 : 1<<31;
+  tap->min_height = tap->trigger_type != TAP_TRIGGER_ON_BOTH_EDGES ? 0 :
+                    tap->start_with_positive_semiwave ? 1<<31 : (~(1<<31));
   tap->val=0;
   tap->max=0;
   tap->min=0;
@@ -81,17 +89,22 @@ static uint8_t set_trigger(uint32_t trigger_pos
   return return_value;
 }
 
-struct tap_enc_t *tapenc_init(uint32_t min_duration, uint8_t sensitivity, uint8_t initial_threshold, enum tap_trigger inverted){
+struct tap_enc_t *tapencoder_init(uint32_t min_duration, uint8_t sensitivity, uint8_t initial_threshold, uint8_t inverted, uint8_t semiwaves){
   struct tap_enc_t *tap;
 
   tap=malloc(sizeof(struct tap_enc_t));
   if (tap==NULL) return NULL;
   tap->min_duration=min_duration;
   tap->initial_threshold = initial_threshold > 127 ? 127 : initial_threshold;
-  tap->trigger_type=inverted;
+  tap->trigger_type=semiwaves ? TAP_TRIGGER_ON_BOTH_EDGES
+                  : inverted ? TAP_TRIGGER_ON_FALLING_EDGE
+                  : TAP_TRIGGER_ON_RISING_EDGE;
+  if(semiwaves)
+    tap->start_with_positive_semiwave = !inverted;
   tap->sensitivity=sensitivity > 100 ? 100 : sensitivity;
   tap->anomaly = NULL;
   tap->old_anomaly = NULL;
+
   reset_state(tap);
   return tap;
 }
