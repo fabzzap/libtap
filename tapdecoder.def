@@ -1,5 +1,5 @@
 LIBRARY	"tapdecoder"
 EXPORTS
-tapdec_init
+tapdecoder_init
 tapdec_set_pulse
 tapdec_get_buffer

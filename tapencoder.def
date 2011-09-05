@@ -1,6 +1,6 @@
 LIBRARY	"tapencoder"
 EXPORTS
-tapenc_init
+tapencoder_init
 tapenc_get_pulse
 tapenc_flush
 tapenc_get_max
