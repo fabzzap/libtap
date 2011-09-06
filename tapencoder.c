@@ -71,22 +71,19 @@ static void reset_state(struct tap_enc_t *tap){
   tap->old_anomaly = NULL;
 }
 
-static uint8_t set_trigger(uint32_t trigger_pos
+static uint32_t set_trigger(uint32_t trigger_pos
                           ,uint32_t *stored_trigger_pos
                           ,uint8_t rising
-                          ,enum tap_trigger trigger_type
-                          ,uint32_t *pulse) {
-  uint8_t return_value = 0;
-
+                          ,enum tap_trigger trigger_type) {
   if(
     (!rising && trigger_type != TAP_TRIGGER_ON_RISING_EDGE)
  || ( rising && trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
     ){
-    return_value = 1;
-    *pulse = trigger_pos - *stored_trigger_pos;
+    uint32_t return_value = trigger_pos - *stored_trigger_pos;
     *stored_trigger_pos = trigger_pos;
+    return return_value;
   }
-  return return_value;
+  return 0;
 }
 
 struct tap_enc_t *tapencoder_init(uint32_t min_duration, uint8_t sensitivity, uint8_t initial_threshold, uint8_t inverted, uint8_t semiwaves){
@@ -123,23 +120,23 @@ static void set_anomaly(struct tap_enc_t *tap, uint32_t prev_minmax, uint8_t ris
   tap->anomaly = anomaly;
 }
 
-uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int buflen, uint8_t *got_pulse, uint32_t *pulse){
+uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int buflen, uint32_t *pulse){
   uint32_t samples_done = 0;
 
-  *got_pulse = 0;
+  *pulse = 0;
 
-  while(!(*got_pulse)){
+  while(*pulse == 0){
     if(tap->cached_trigger){
       if(tap->anomaly){
-        *got_pulse = set_trigger(tap->anomaly->pos, &tap->trigger_pos, tap->anomaly->rising, tap->trigger_type, pulse);
+        *pulse = set_trigger(tap->anomaly->pos, &tap->trigger_pos, tap->anomaly->rising, tap->trigger_type);
         free(tap->anomaly);
         tap->anomaly = NULL;
       }
       else{
-        *got_pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, tap->min > tap->max, tap->trigger_type, pulse);
+        *pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, tap->min > tap->max, tap->trigger_type);
         tap->cached_trigger = 0;
       }
-      if (*got_pulse)
+      if (*pulse)
         break;
     }
     if(samples_done >= buflen)
@@ -231,7 +228,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
         tap->old_anomaly = tap->anomaly;
         tap->anomaly = NULL;
       }
-      *got_pulse = set_trigger(tap->old_anomaly->pos, &tap->trigger_pos, tap->old_anomaly->rising, tap->trigger_type, pulse);
+      *pulse = set_trigger(tap->old_anomaly->pos, &tap->trigger_pos, tap->old_anomaly->rising, tap->trigger_type);
       free(tap->old_anomaly);
       tap->old_anomaly = NULL;
     }

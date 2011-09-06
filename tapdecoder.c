@@ -52,19 +52,24 @@ static int32_t tap_get_squarewave_val(uint32_t this_pulse_len, uint32_t to_be_co
   return volume;
 }
 
-static uint32_t tap_semiwave(struct tap_dec_t *tap, int32_t **buffer, uint32_t *buflen, uint8_t get_first_semiwave){
+static uint32_t tap_semiwave(int32_t **buffer
+                            ,uint32_t *buflen
+                            ,uint32_t semiwave_len
+                            ,uint32_t *consumed
+                            ,uint32_t volume
+                            ,int32_t (*get_val_func)(uint32_t, uint32_t, uint32_t)
+                            ,unsigned char *negative
+                            ){
   uint32_t samples_done = 0;
-  uint32_t semiwave_len = get_first_semiwave ? tap->first_semiwave : tap->second_semiwave;
-  uint32_t *consumed = get_first_semiwave ? &tap->first_consumed : &tap->second_consumed;
 
   for(;*buflen > 0 && *consumed < semiwave_len; (*buffer)++, (*buflen)--, (*consumed)++, samples_done++){
-    **buffer = tap->get_val(*consumed, semiwave_len, tap->volume);
-    if (tap->negative)
+    **buffer = get_val_func(*consumed, semiwave_len, volume);
+    if (*negative)
       **buffer = ~(**buffer);
   }
 
   if (*consumed == semiwave_len && samples_done != 0)
-    tap->negative = !tap->negative;
+    *negative = !(*negative);
 
   return samples_done;
 }  
@@ -104,9 +109,8 @@ void tapdec_set_pulse(struct tap_dec_t *tap, uint32_t pulse){
 }
 
 uint32_t tapdec_get_buffer(struct tap_dec_t *tap, int32_t *buffer, uint32_t buflen){
-  uint32_t samples_done_first = tap_semiwave(tap, &buffer, &buflen, 1);
-  uint32_t samples_done_second = tap_semiwave(tap, &buffer, &buflen, 0);
+  uint32_t samples_done_first = tap_semiwave(&buffer, &buflen, tap->first_semiwave, &tap->first_consumed, tap->volume, tap->get_val, &tap->negative);
+  uint32_t samples_done_second = tap_semiwave(&buffer, &buflen, tap->second_semiwave, &tap->second_consumed, tap->volume, tap->get_val, &tap->negative);
 
   return samples_done_first + samples_done_second;
 }
-
