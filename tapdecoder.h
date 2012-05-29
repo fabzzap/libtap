@@ -14,9 +14,13 @@
  */
 
 #include <stdint.h>
-#include "tap_types.h"
 
 struct tap_dec_t;
+enum tapdec_waveform {
+  TAPDEC_TRIANGLE,
+  TAPDEC_SQUARE,
+  TAPDEC_SINE
+};
 
 struct tap_dec_t *tapdecoder_init(uint8_t volume, uint8_t inverted, uint8_t semiwaves, enum tapdec_waveform waveform);
 void tapdec_set_pulse(struct tap_dec_t *tap, uint32_t pulse);
