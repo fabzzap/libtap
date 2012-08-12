@@ -3,3 +3,4 @@ EXPORTS
 tapdecoder_init
 tapdec_set_pulse
 tapdec_get_buffer
+tapdecoder_exit

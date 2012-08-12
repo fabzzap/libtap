@@ -114,3 +114,8 @@ uint32_t tapdec_get_buffer(struct tap_dec_t *tap, int32_t *buffer, uint32_t bufl
 
   return samples_done_first + samples_done_second;
 }
+
+void tapdecoder_exit(struct tap_dec_t *tap)
+{
+  free(tap);
+}

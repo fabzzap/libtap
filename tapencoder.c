@@ -257,3 +257,7 @@ void tapenc_invert(struct tap_enc_t *tap)
     tap->trigger_type = TAP_TRIGGER_ON_FALLING_EDGE;
 }
 
+void tapencoder_exit(struct tap_enc_t *tap)
+{
+  free(tap);
+}
