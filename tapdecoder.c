@@ -7,7 +7,7 @@
  * The algorithm to decode TAP data into square, sine or triangular waves
  * is by Fabrizio Gennari.
  *
- * Copyright (c) Fabrizio Gennari, 2003-2011
+ * Copyright (c) Fabrizio Gennari, 2003-2012
  *
  * The program is distributed under the GNU Lesser General Public License.
  * See file LESSER-LICENSE.TXT for details.
@@ -25,7 +25,7 @@
 
 
 struct tap_dec_t{
-  uint8_t semiwaves;
+  uint8_t halfwaves;
   uint32_t first_consumed, second_consumed, first_semiwave, second_semiwave, volume;
   unsigned char negative;
   int32_t (*get_val)(uint32_t to_be_consumed, uint32_t this_pulse_len, uint32_t volume);
@@ -74,12 +74,13 @@ static uint32_t tap_semiwave(int32_t **buffer
   return samples_done;
 }  
 
-struct tap_dec_t *tapdecoder_init(uint8_t volume, uint8_t inverted, uint8_t semiwaves, enum tapdec_waveform waveform){
+struct tap_dec_t *tapdec_init2(uint8_t volume, uint8_t inverted, enum tapdec_waveform waveform){
   struct tap_dec_t *tap;
 
-  tap=malloc(sizeof(struct tap_dec_t));
-  if (tap==NULL) return NULL;
-  tap->semiwaves=semiwaves;
+  tap = (struct tap_dec_t *)malloc(sizeof(struct tap_dec_t));
+  if (tap==NULL)
+    return NULL;
+  tap->halfwaves = 0;
   tap->volume=volume<<23;
   tap->negative=inverted;
   switch (waveform){
@@ -102,9 +103,9 @@ struct tap_dec_t *tapdecoder_init(uint8_t volume, uint8_t inverted, uint8_t semi
 
 void tapdec_set_pulse(struct tap_dec_t *tap, uint32_t pulse){
   tap->first_consumed=tap->second_consumed=0;
-  if (pulse==1 && !tap->semiwaves)
+  if (pulse==1 && !tap->halfwaves)
     pulse=0;
-  tap->second_semiwave = tap->semiwaves ? 0 : pulse / 2;
+  tap->second_semiwave = tap->halfwaves ? 0 : pulse / 2;
   tap->first_semiwave=pulse - tap->second_semiwave;
 }
 
@@ -115,7 +116,11 @@ uint32_t tapdec_get_buffer(struct tap_dec_t *tap, int32_t *buffer, uint32_t bufl
   return samples_done_first + samples_done_second;
 }
 
-void tapdecoder_exit(struct tap_dec_t *tap)
+void tapdec_enable_halfwaves(struct tap_dec_t *tap, uint8_t halfwaves){
+  tap->halfwaves = halfwaves;
+}
+
+void tapdec_exit(struct tap_dec_t *tap)
 {
   free(tap);
 }

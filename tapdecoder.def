@@ -1,6 +1,7 @@
 LIBRARY	"tapdecoder"
 EXPORTS
-tapdecoder_init
+tapdec_init2
 tapdec_set_pulse
 tapdec_get_buffer
-tapdecoder_exit
+tapdec_enable_halfwaves
+tapdec_exit

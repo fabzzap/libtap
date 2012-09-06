@@ -7,7 +7,7 @@
  * The algorithm to decode TAP data into square, sine or triangular waves
  * is by Fabrizio Gennari.
  *
- * Copyright (c) Fabrizio Gennari, 2003-2011
+ * Copyright (c) Fabrizio Gennari, 2003-2012
  *
  * The program is distributed under the GNU Lesser General Public License.
  * See file LESSER-LICENSE.TXT for details.
@@ -22,7 +22,8 @@ enum tapdec_waveform {
   TAPDEC_SINE
 };
 
-struct tap_dec_t *tapdecoder_init(uint8_t volume, uint8_t inverted, uint8_t semiwaves, enum tapdec_waveform waveform);
+struct tap_dec_t *tapdec_init2(uint8_t volume, uint8_t inverted, enum tapdec_waveform waveform);
 void tapdec_set_pulse(struct tap_dec_t *tap, uint32_t pulse);
 uint32_t tapdec_get_buffer(struct tap_dec_t *tap, int32_t *buffer, unsigned int buflen);
-void tapdecoder_exit(struct tap_dec_t *tap);
+void tapdec_enable_halfwaves(struct tap_dec_t *tap, uint8_t halfwaves);
+void tapdec_exit(struct tap_dec_t *tap);

@@ -8,7 +8,7 @@
  * Kujala, based on the one written by Andreas Matthies for Tape64.
  * Some modifications and adaptation to library format by Fabrizio Gennari
  *
- * Copyright (c) Fabrizio Gennari, 2003-2011
+ * Copyright (c) Fabrizio Gennari, 2003-2012
  *
  * The program is distributed under the GNU Lesser General Public License.
  * See file LESSER-LICENSE.TXT for details.
@@ -26,7 +26,8 @@ struct anomalies{
 enum tap_trigger {
   TAP_TRIGGER_ON_RISING_EDGE,
   TAP_TRIGGER_ON_FALLING_EDGE,
-  TAP_TRIGGER_ON_BOTH_EDGES
+  TAP_TRIGGER_ON_BOTH_EDGES,
+  TAP_DO_NOT_TRIGGER_ON_NEXT_EDGE
 };
 
 struct tap_enc_t{
@@ -42,18 +43,14 @@ struct tap_enc_t{
   enum tap_trigger trigger_type;
   uint8_t initial_threshold;
   uint8_t triggered, cached_trigger;
-  uint8_t start_with_positive_semiwave;
+  uint8_t start_with_positive_halfwave;
   struct anomalies *anomaly, *old_anomaly;
 };
 
 static void reset_state(struct tap_enc_t *tap){
   tap->increasing=0;
   tap->input_pos=0;
-  /* When creating semiwaves, the first trigger must be after the first max,
-     else the TAP won't work with VICE. This ensures that the first min
-     comes after the first max */
-  tap->min_height = tap->trigger_type != TAP_TRIGGER_ON_BOTH_EDGES ? 0 :
-                    tap->start_with_positive_semiwave ? 1<<31 : (~(1<<31));
+  tap->min_height = 0;
   tap->val=0;
   tap->max=0;
   tap->min=0;
@@ -69,15 +66,21 @@ static void reset_state(struct tap_enc_t *tap){
   free(tap->old_anomaly);
   tap->anomaly = NULL;
   tap->old_anomaly = NULL;
+  tap->trigger_type = tap->start_with_positive_halfwave
+    ? TAP_TRIGGER_ON_RISING_EDGE
+    : TAP_TRIGGER_ON_FALLING_EDGE;
 }
 
 static uint32_t set_trigger(uint32_t trigger_pos
                           ,uint32_t *stored_trigger_pos
                           ,uint8_t rising
-                          ,enum tap_trigger trigger_type) {
-  if(
-    (!rising && trigger_type != TAP_TRIGGER_ON_RISING_EDGE)
- || ( rising && trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
+                          ,enum tap_trigger *trigger_type) {
+  if(*trigger_type == TAP_DO_NOT_TRIGGER_ON_NEXT_EDGE)
+    *trigger_type = rising ? TAP_TRIGGER_ON_FALLING_EDGE
+                           : TAP_TRIGGER_ON_RISING_EDGE;
+  else if(
+    (!rising && *trigger_type != TAP_TRIGGER_ON_RISING_EDGE)
+ || ( rising && *trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
     ){
     uint32_t return_value = trigger_pos - *stored_trigger_pos;
     *stored_trigger_pos = trigger_pos;
@@ -86,18 +89,14 @@ static uint32_t set_trigger(uint32_t trigger_pos
   return 0;
 }
 
-struct tap_enc_t *tapencoder_init(uint32_t min_duration, uint8_t sensitivity, uint8_t initial_threshold, uint8_t inverted, uint8_t semiwaves){
-  struct tap_enc_t *tap;
+struct tap_enc_t *tapenc_init2(uint32_t min_duration, uint8_t sensitivity, uint8_t initial_threshold, uint8_t inverted){
+  struct tap_enc_t *tap = (struct tap_enc_t *)malloc(sizeof(struct tap_enc_t));
 
-  tap=malloc(sizeof(struct tap_enc_t));
-  if (tap==NULL) return NULL;
+  if (tap==NULL)
+    return NULL;
   tap->min_duration=min_duration;
   tap->initial_threshold = initial_threshold > 127 ? 127 : initial_threshold;
-  tap->trigger_type=semiwaves ? TAP_TRIGGER_ON_BOTH_EDGES
-                  : inverted ? TAP_TRIGGER_ON_FALLING_EDGE
-                  : TAP_TRIGGER_ON_RISING_EDGE;
-  if(semiwaves)
-    tap->start_with_positive_semiwave = !inverted;
+  tap->start_with_positive_halfwave = !inverted;
   tap->sensitivity=sensitivity > 100 ? 100 : sensitivity;
   tap->anomaly = NULL;
   tap->old_anomaly = NULL;
@@ -107,7 +106,7 @@ struct tap_enc_t *tapencoder_init(uint32_t min_duration, uint8_t sensitivity, ui
 }
 
 static void set_anomaly(struct tap_enc_t *tap, uint32_t prev_minmax, uint8_t rising){
-  struct anomalies *anomaly = malloc(sizeof(struct anomalies));
+  struct anomalies *anomaly = (struct anomalies *)malloc(sizeof(struct anomalies));
 
   anomaly->resolution_level = tap->trigger_level;
   anomaly->pos = tap->input_pos / 2 + prev_minmax / 2
@@ -128,12 +127,12 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
   while(*pulse == 0){
     if(tap->cached_trigger){
       if(tap->anomaly){
-        *pulse = set_trigger(tap->anomaly->pos, &tap->trigger_pos, tap->anomaly->rising, tap->trigger_type);
+        *pulse = set_trigger(tap->anomaly->pos, &tap->trigger_pos, tap->anomaly->rising, &tap->trigger_type);
         free(tap->anomaly);
         tap->anomaly = NULL;
       }
       else{
-        *pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, tap->min > tap->max, tap->trigger_type);
+        *pulse = set_trigger(tap->input_pos - 1, &tap->trigger_pos, tap->min > tap->max, &tap->trigger_type);
         tap->cached_trigger = 0;
       }
       if (*pulse)
@@ -228,7 +227,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
         tap->old_anomaly = tap->anomaly;
         tap->anomaly = NULL;
       }
-      *pulse = set_trigger(tap->old_anomaly->pos, &tap->trigger_pos, tap->old_anomaly->rising, tap->trigger_type);
+      *pulse = set_trigger(tap->old_anomaly->pos, &tap->trigger_pos, tap->old_anomaly->rising, &tap->trigger_type);
       free(tap->old_anomaly);
       tap->old_anomaly = NULL;
     }
@@ -257,7 +256,21 @@ void tapenc_invert(struct tap_enc_t *tap)
     tap->trigger_type = TAP_TRIGGER_ON_FALLING_EDGE;
 }
 
-void tapencoder_exit(struct tap_enc_t *tap)
+void tapenc_toggle_trigger_on_both_edges(struct tap_enc_t *tap, uint8_t both_edges)
+{
+  if (both_edges){
+  /* When creating halfwaves, the first trigger must be after the first max,
+     else the TAP won't work with VICE. This ensures that the first min
+     comes after the first max */
+    if(tap->max == 0 && tap->min == 0)
+      tap->min_height = tap->start_with_positive_halfwave ? 1<<31 : (~(1<<31));
+    tap->trigger_type = TAP_TRIGGER_ON_BOTH_EDGES;
+  }
+  else if (tap->trigger_type == TAP_TRIGGER_ON_BOTH_EDGES)
+    tap->trigger_type = TAP_DO_NOT_TRIGGER_ON_NEXT_EDGE;
+}
+
+void tapenc_exit(struct tap_enc_t *tap)
 {
   free(tap);
 }
