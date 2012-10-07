@@ -1,11 +1,11 @@
 all: tapencoder.dll tapdecoder.dll
 
 ifdef WITH_SINE
-  libtapdecoder.so:ADD_CFLAGS+=-DHAVE_SINE_WAVE
+  libtapdecoder.so tapdecoder.dll:ADD_CFLAGS+=-DHAVE_SINE_WAVE
   libtapdecoder.so:ADD_LDFLAGS=-lm
 endif
 
-%.dll:ADD_CFLAGS+=-Wl,--out-implib=$*.lib
+%.dll:ADD_LDFLAGS+=-Wl,--out-implib=$*.lib
 
 clean:
 	rm -f *.dll *.lib *~ *.so
