@@ -17,9 +17,14 @@
 #include <sys/types.h>
 /* When using GNU libc, math.h requires linking
    with the additional library libm. Therefore,
-   using math.h is disabled by default,
-   HAVE_SINE_WAVE is needed */
-#if (!defined __GNU_LIBRARY__ || defined HAVE_SINE_WAVE)
+   HAVE_SINE_WAVE is disabled by default,
+   but it can be activated by setting a
+   Makefile variable */
+#ifndef __GNU_LIBRARY__
+#define HAVE_SINE_WAVE
+#endif
+
+#ifdef HAVE_SINE_WAVE
 #ifdef _MSC_VER
 #define _USE_MATH_DEFINES
 #endif /* _MSC_VER*/
