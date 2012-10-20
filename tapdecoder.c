@@ -20,17 +20,13 @@
    HAVE_SINE_WAVE is disabled by default,
    but it can be activated by setting a
    Makefile variable */
-#ifndef __GNU_LIBRARY__
+#if (!defined __GNU_LIBRARY__ && (!defined _MSC_VER || _MSC_VER > 1200))
 #define HAVE_SINE_WAVE
 #endif
 
 #ifdef HAVE_SINE_WAVE
 #ifdef _MSC_VER
-#if _MSC_VER > 1200
 #define _USE_MATH_DEFINES
-#else
-#undef HAVE_SINE_WAVE
-#endif /* _MSC_VER > 1200 */
 #endif /* _MSC_VER */
 #include <math.h>
 #endif /*HAVE_SINE_WAVE*/
