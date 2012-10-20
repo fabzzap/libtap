@@ -12,6 +12,18 @@ clean:
 
 lib%.so: %.c
 	$(CC) $(CFLAGS) $(ADD_CFLAGS) -shared -o $@ $^ $(LDFLAGS) $(ADD_LDFLAGS)
-	
-%.dll: %.c %.def
-	$(CC) $(CFLAGS) $(ADD_CFLAGS) -shared -o $@ $^ $(LDFLAGS) $(ADD_LDFLAGS)
+
+ifdef WITH_VERSION
+  RESOURCE_OBJECT=%-resource.o
+endif
+
+%.dll: %-resource.o
+
+WINDRES=windres
+
+%-resource.o: %-resource.rc
+	$(WINDRES) -o $@ $^
+
+
+%.dll: %.c %.def $(RESOURCE_OBJECT)
+	$(CC) $(CFLAGS) $(ADD_CFLAGS) -shared -o $@ $+ $(LDFLAGS) $(ADD_LDFLAGS)
