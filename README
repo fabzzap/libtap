@@ -28,11 +28,11 @@ Some modifiers:
   >make CC=i586-mingw32msvc-gcc
    if you are running Linux and you want to produce Windows DLLs (and you have
    the MinGW cross-compiler installed)
-* HAVE_SINE_WAVE: set to 1 to build sine waves into tapdecoder, when using
+* WITH_SINE: set to 1 to build sine waves into tapdecoder, when using
   glibc. Generation of sine waves requires a mathematical function whcih glibc
   only provides in a separate library. If your platform does not use glibc
   (e.g. Windows or Mac), this is not needed. Examples:
-  >make libtapdecoder.so HAVE_SINE_WAVE=1
+  >make libtapdecoder.so WITH_SINE=1
 * CFLAGS: compiler flags
   For example, gcc and LLVM accept -g to build debug versions, which can be
   debugged using gdb. Examples:
