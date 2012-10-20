@@ -26,8 +26,12 @@
 
 #ifdef HAVE_SINE_WAVE
 #ifdef _MSC_VER
+#if _MSC_VER > 1200
 #define _USE_MATH_DEFINES
-#endif /* _MSC_VER*/
+#else
+#undef HAVE_SINE_WAVE
+#endif /* _MSC_VER > 1200 */
+#endif /* _MSC_VER */
 #include <math.h>
 #endif /*HAVE_SINE_WAVE*/
 #include "tapdecoder.h"
