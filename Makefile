@@ -26,4 +26,4 @@ WINDRES=windres
 
 
 %.dll: %.c %.def $(RESOURCE_OBJECT)
-	$(CC) $(CFLAGS) $(ADD_CFLAGS) -shared -o $@ $+ $(LDFLAGS) $(ADD_LDFLAGS)
+	$(CC) $(CFLAGS) $(ADD_CFLAGS) -shared -static-libgcc -o $@ $+ $(LDFLAGS) $(ADD_LDFLAGS)
