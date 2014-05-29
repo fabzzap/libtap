@@ -266,8 +266,16 @@ void tapenc_toggle_trigger_on_both_edges(struct tap_enc_t *tap, uint8_t both_edg
       tap->min_height = tap->start_with_positive_halfwave ? 1<<31 : (~(1<<31));
     tap->trigger_type = TAP_TRIGGER_ON_BOTH_EDGES;
   }
-  else if (tap->trigger_type == TAP_TRIGGER_ON_BOTH_EDGES)
-    tap->trigger_type = TAP_DO_NOT_TRIGGER_ON_NEXT_EDGE;
+  else if (tap->trigger_type == TAP_TRIGGER_ON_BOTH_EDGES){
+    if(tap->max == 0 && tap->min == 0){
+      tap->trigger_type = tap->start_with_positive_halfwave
+        ? TAP_TRIGGER_ON_RISING_EDGE
+        : TAP_TRIGGER_ON_FALLING_EDGE;
+      tap->min_height = 0;
+    }
+    else
+      tap->trigger_type = TAP_DO_NOT_TRIGGER_ON_NEXT_EDGE;
+  }
 }
 
 void tapenc_exit(struct tap_enc_t *tap)
