@@ -34,7 +34,7 @@ struct tap_enc_t{
   uint32_t increasing;
   uint32_t prev_increasing;
   uint32_t input_pos;
-  uint32_t min_duration;
+  uint32_t min_duration, min_non_silence_duration;
   int32_t min_height;
   int32_t trigger_level;
   int32_t val, prev_val, max_val, min_val;
@@ -42,6 +42,7 @@ struct tap_enc_t{
   uint8_t sensitivity;
   enum tap_trigger trigger_type;
   uint8_t initial_threshold;
+  int32_t silence_threshold;
   uint8_t triggered, cached_trigger;
   uint8_t start_with_positive_halfwave;
   struct anomalies *anomaly, *old_anomaly;
@@ -101,8 +102,16 @@ struct tap_enc_t *tapenc_init2(uint32_t min_duration, uint8_t sensitivity, uint8
   tap->anomaly = NULL;
   tap->old_anomaly = NULL;
 
+  tapenc_set_silence_threshold(tap, 1, 4);
   reset_state(tap);
   return tap;
+}
+
+void tapenc_set_silence_threshold(struct tap_enc_t *tap,
+                                  uint8_t silence_threshold,
+                                  uint32_t min_non_silence_duration){
+  tap->silence_threshold = ((silence_threshold > 127 ? 127 : silence_threshold) << 24);
+  tap->min_non_silence_duration = min_non_silence_duration;
 }
 
 static void set_anomaly(struct tap_enc_t *tap, uint32_t prev_minmax, uint8_t rising){
@@ -168,9 +177,15 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
           tap->prev_val / 2 + tap->max_val / 2
           : 0;
         tap->min_val = tap->prev_val;
-        tap->min_height = tap->max>0 ?
-        tap->min_val/200*(100+tap->sensitivity) + tap->max_val/200*(100-tap->sensitivity)
-            : tap->initial_threshold<<24;
+        if ((tap->max_val - tap->min_val < tap->silence_threshold
+        && tap->input_pos - tap->max < tap->min_non_silence_duration)
+        || tap->max == 0) {
+          tap->min_height = tap->initial_threshold<<24;
+          tap->min_val = -tap->initial_threshold<<24;
+        } else {
+          tap->min_height =
+            tap->min_val/200*(100+tap->sensitivity) + tap->max_val/200*(100-tap->sensitivity);
+        }
       }
       else if (!tap->increasing
              && (tap->input_pos - tap->min > tap->min_duration || tap->triggered)
@@ -188,9 +203,15 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
           tap->prev_val / 2 + tap->min_val / 2
           : 0;
         tap->max_val = tap->prev_val;
-        tap->min_height = tap->min>0 ?
-        tap->min_val/200*(100-tap->sensitivity) + tap->max_val/200*(100+tap->sensitivity)
-            : -tap->initial_threshold<<24;
+        if ((tap->max_val - tap->min_val < tap->silence_threshold
+        && tap->input_pos - tap->min < tap->min_non_silence_duration)
+        || tap->min == 0) {
+          tap->min_height = -tap->initial_threshold<<24;
+          tap->max_val = tap->initial_threshold<<24;
+        } else {
+          tap->min_height =
+            tap->min_val/200*(100-tap->sensitivity) + tap->max_val/200*(100+tap->sensitivity);
+        }
       }
     }
     if(!tap->triggered && tap->anomaly != NULL){
