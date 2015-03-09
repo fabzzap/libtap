@@ -72,6 +72,20 @@ static void reset_state(struct tap_enc_t *tap){
     : TAP_TRIGGER_ON_FALLING_EDGE;
 }
 
+#ifdef TAPENCODER_DEBUG
+#define TAPENCODER_DEBUG_START 0
+#define TAPENCODER_DEBUG_END 0x7fffffff
+#include <stdio.h>
+
+static void debug_print(uint32_t pos, uint32_t old_pos, char what){
+  if (pos<TAPENCODER_DEBUG_START || pos>TAPENCODER_DEBUG_END)
+    return;
+  printf("%u %u %c\n",pos, pos-old_pos,what);
+}
+#else
+#define debug_print(pos, old_pos, what)
+#endif
+
 static uint32_t set_trigger(uint32_t trigger_pos
                           ,uint32_t *stored_trigger_pos
                           ,uint8_t rising
@@ -84,6 +98,7 @@ static uint32_t set_trigger(uint32_t trigger_pos
  || ( rising && *trigger_type != TAP_TRIGGER_ON_FALLING_EDGE)
     ){
     uint32_t return_value = trigger_pos - *stored_trigger_pos;
+    debug_print(trigger_pos, *stored_trigger_pos, 't');
     *stored_trigger_pos = trigger_pos;
     return return_value;
   }
@@ -170,6 +185,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
             set_anomaly(tap, tap->max, 0);
           else
             tap->triggered = 0;
+          debug_print(tap->input_pos, tap->max, 'm');
           tap->prev_min = tap->min;
           tap->min = tap->input_pos;
         }
@@ -196,6 +212,7 @@ uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, unsigned int b
             set_anomaly(tap, tap->min, 1);
           else
             tap->triggered = 0;
+          debug_print(tap->input_pos, tap->min, 'M');
           tap->prev_max = tap->max;
           tap->max = tap->input_pos;
         }
