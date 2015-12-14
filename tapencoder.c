@@ -286,6 +286,10 @@ int32_t tapenc_get_max(struct tap_enc_t *tap){
   return tap->max_val;
 }
 
+uint32_t tapenc_get_last_trigger(struct tap_enc_t *tap){
+  return tap->trigger_pos;
+}
+
 void tapenc_invert(struct tap_enc_t *tap)
 {
   if (tap->trigger_type == TAP_TRIGGER_ON_FALLING_EDGE)

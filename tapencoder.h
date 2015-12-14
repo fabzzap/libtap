@@ -22,6 +22,7 @@ struct tap_enc_t *tapenc_init2(uint32_t min_duration, uint8_t sensitivity, uint8
 uint32_t tapenc_get_pulse(struct tap_enc_t *tap, int32_t *buffer, uint32_t buflen, uint32_t *pulse);
 uint32_t tapenc_flush(struct tap_enc_t *tap);
 int32_t tapenc_get_max(struct tap_enc_t *tap);
+uint32_t tapenc_get_last_trigger(struct tap_enc_t *tap);
 void tapenc_invert(struct tap_enc_t *tap);
 void tapenc_toggle_trigger_on_both_edges(struct tap_enc_t *tap, uint8_t both_edges);
 void tapenc_set_silence_threshold(struct tap_enc_t *tap,
